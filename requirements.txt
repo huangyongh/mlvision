@@ -1,0 +1,16 @@
+streamlit
+pandas
+scikit-learn
+matplotlib
+opencv-python
+numpy
+pytorch
+xgboost
+joblib
+lightgbm
+seaborn
+pyyaml
+fastapi
+uvicorn
+PyYAML
+pydantic

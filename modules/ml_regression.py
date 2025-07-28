@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
 import matplotlib
+from sklearn.preprocessing import MinMaxScaler
 matplotlib.rcParams['font.sans-serif'] = ['SimHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
@@ -42,6 +43,15 @@ def run():
         if not feature_cols or not label_col:
             st.warning("请至少选择一个特征和一个标签！")
             st.stop()
+
+    # 3.1 归一化
+    st.markdown("**特征与目标归一化（MinMaxScaler 0-1）**")
+    scaler_X = MinMaxScaler()
+    scaler_y = MinMaxScaler()
+    df[feature_cols] = scaler_X.fit_transform(df[feature_cols])
+    df[label_col] = scaler_y.fit_transform(df[[label_col]])
+    st.write("归一化后样例：")
+    st.dataframe(df[feature_cols + [label_col]].head())
 
     # 3. 训练/测试集划分
     with st.expander("2️⃣ 训练/测试集划分"):
@@ -144,15 +154,20 @@ def run():
                 st.write(f"[{m}] 交叉验证R²: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
             # 测试集评估
             y_pred = model.predict(X_test)
-            mse = mean_squared_error(y_test, y_pred)
-            mae = mean_absolute_error(y_test, y_pred)
-            r2 = r2_score(y_test, y_pred)
+
+            # 反归一化
+            y_pred_inv = scaler_y.inverse_transform(y_pred.reshape(-1, 1)).flatten()
+            y_test_inv = scaler_y.inverse_transform(y_test.values.reshape(-1, 1)).flatten()
+
+            mse = mean_squared_error(y_test_inv, y_pred_inv)
+            mae = mean_absolute_error(y_test_inv, y_pred_inv)
+            r2 = r2_score(y_test_inv, y_pred_inv)
             metrics_dict[m] = {"MSE": mse, "MAE": mae, "R²": r2}
             # 1. 预测-真实值散点图（x=真实值，y=预测值，真实值o蓝色，预测值x橙色，带图例）
             fig_pred, ax_pred = plt.subplots()
-            idxs = np.arange(len(y_test))
-            ax_pred.scatter(y_test, y_test, alpha=0.5, label='真实值', marker='o', color='blue')
-            ax_pred.scatter(y_test, y_pred, alpha=0.5, label='预测值', marker='x', color='orange')
+            idxs = np.arange(len(y_test_inv))
+            ax_pred.scatter(y_test_inv, y_test_inv, alpha=0.5, label='真实值', marker='o', color='blue')
+            ax_pred.scatter(y_test_inv, y_pred_inv, alpha=0.5, label='预测值', marker='x', color='orange')
             ax_pred.set_xlabel('真实值')
             ax_pred.set_ylabel('预测值')
             ax_pred.set_title(f'{m} 测试集预测-真实值')
@@ -160,7 +175,7 @@ def run():
             figs_pred.append(fig_pred)
             # 2. 残差分布图
             fig_res, ax_res = plt.subplots()
-            residuals = y_test - y_pred
+            residuals = y_test_inv - y_pred_inv
             sns.histplot(residuals, bins=30, kde=True, ax=ax_res)
             ax_res.set_title(f'{m} 残差分布')
             ax_res.set_xlabel('残差')

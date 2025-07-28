@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
 import matplotlib
+from sklearn.preprocessing import MinMaxScaler
 matplotlib.rcParams['font.sans-serif'] = ['SimHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
@@ -51,6 +52,15 @@ def run():
         if not feature_cols or not label_col:
             st.warning("请至少选择一个特征和一个标签！")
             st.stop()
+
+    # 3.1 归一化
+    st.markdown("**特征与目标归一化（MinMaxScaler 0-1）**")
+    scaler_X = MinMaxScaler()
+    scaler_y = MinMaxScaler()
+    df[feature_cols] = scaler_X.fit_transform(df[feature_cols])
+    df[label_col] = scaler_y.fit_transform(df[[label_col]])
+    st.write("归一化后样例：")
+    st.dataframe(df[feature_cols + [label_col]].head())
 
     # 3.1 预测类型与特征构建
     with st.expander("3️⃣ 预测类型与特征构建"):
@@ -222,14 +232,17 @@ def run():
                 step_figs_res = []
                 step_figs_imp = []
                 for i, step in enumerate(target_cols):
-                    mse = mean_squared_error(y_test[step], y_pred[:, i])
-                    mae = mean_absolute_error(y_test[step], y_pred[:, i])
-                    r2 = r2_score(y_test[step], y_pred[:, i])
+                    # 反归一化
+                    y_pred_inv = scaler_y.inverse_transform(y_pred[:, i].reshape(-1, 1)).flatten()
+                    y_test_inv = scaler_y.inverse_transform(y_test[step].values.reshape(-1, 1)).flatten()
+                    mse = mean_squared_error(y_test_inv, y_pred_inv)
+                    mae = mean_absolute_error(y_test_inv, y_pred_inv)
+                    r2 = r2_score(y_test_inv, y_pred_inv)
                     step_metrics[step] = {"MSE": mse, "MAE": mae, "R²": r2}
                     # 1. 预测-真实值折线图（按时间）
                     fig_pred, ax_pred = plt.subplots()
-                    ax_pred.plot(time_test, y_test[step], label='真实值', marker='o', color='blue')
-                    ax_pred.plot(time_test, y_pred[:, i], label='预测值', marker='x', color='orange')
+                    ax_pred.plot(time_test, y_test_inv, label='真实值', marker='o', color='blue')
+                    ax_pred.plot(time_test, y_pred_inv, label='预测值', marker='x', color='orange')
                     ax_pred.set_xlabel('时间')
                     ax_pred.set_ylabel('数值')
                     ax_pred.set_title(f'{m} {step} 测试集预测-真实值（按时间）')
@@ -237,7 +250,7 @@ def run():
                     step_figs_pred.append(fig_pred)
                     # 2. 残差分布图
                     fig_res, ax_res = plt.subplots()
-                    residuals = y_test[step] - y_pred[:, i]
+                    residuals = y_test_inv - y_pred_inv
                     sns.histplot(residuals, bins=30, kde=True, ax=ax_res)
                     ax_res.set_title(f'{m} {step} 残差分布')
                     ax_res.set_xlabel('残差')
@@ -314,14 +327,17 @@ def run():
                     st.write(f"[{m}] 交叉验证R²: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
                 # 测试集评估
                 y_pred = model.predict(X_test)
-                mse = mean_squared_error(y_test, y_pred)
-                mae = mean_absolute_error(y_test, y_pred)
-                r2 = r2_score(y_test, y_pred)
+                # 反归一化
+                y_pred_inv = scaler_y.inverse_transform(y_pred.reshape(-1, 1)).flatten()
+                y_test_inv = scaler_y.inverse_transform(y_test.values.reshape(-1, 1)).flatten()
+                mse = mean_squared_error(y_test_inv, y_pred_inv)
+                mae = mean_absolute_error(y_test_inv, y_pred_inv)
+                r2 = r2_score(y_test_inv, y_pred_inv)
                 metrics_dict[m] = {"MSE": mse, "MAE": mae, "R²": r2}
                 # 1. 预测-真实值折线图（按时间）
                 fig_pred, ax_pred = plt.subplots()
-                ax_pred.plot(time_test, y_test, label='真实值', marker='o', color='blue')
-                ax_pred.plot(time_test, y_pred, label='预测值', marker='x', color='orange')
+                ax_pred.plot(time_test, y_test_inv, label='真实值', marker='o', color='blue')
+                ax_pred.plot(time_test, y_pred_inv, label='预测值', marker='x', color='orange')
                 ax_pred.set_xlabel('时间')
                 ax_pred.set_ylabel('数值')
                 ax_pred.set_title(f'{m} 测试集预测-真实值（按时间）')
@@ -329,7 +345,7 @@ def run():
                 figs_pred.append(fig_pred)
                 # 2. 残差分布图
                 fig_res, ax_res = plt.subplots()
-                residuals = y_test - y_pred
+                residuals = y_test_inv - y_pred_inv
                 sns.histplot(residuals, bins=30, kde=True, ax=ax_res)
                 ax_res.set_title(f'{m} 残差分布')
                 ax_res.set_xlabel('残差')

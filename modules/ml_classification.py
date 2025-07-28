@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
 import matplotlib
+from sklearn.preprocessing import MinMaxScaler
 matplotlib.rcParams['font.sans-serif'] = ['SimHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
@@ -44,6 +45,13 @@ def run():
         if not feature_cols or not label_col:
             st.warning("请至少选择一个特征和一个标签！")
             st.stop()
+
+    # 3.1 归一化
+    st.markdown("**特征与目标归一化（MinMaxScaler 0-1）**")
+    scaler_X = MinMaxScaler()
+    df[feature_cols] = scaler_X.fit_transform(df[feature_cols])
+    st.write("归一化后样例：")
+    st.dataframe(df[feature_cols + [label_col]].head())
 
     # 标签分布检查
     y = df[label_col]
